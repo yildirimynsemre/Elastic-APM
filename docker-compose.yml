@@ -1,0 +1,90 @@
+version: '3.3'
+services:
+  apmtest:
+    build: 
+      context: ./
+      dockerfile: ./Dockerfile
+    restart: always
+    environment:
+      MONGO_URI: "mongodb://root:root@mongo:27017"
+      MONGO_DB: "Testt"
+      ASPNETCORE_URLS: "http://*:80/"
+    ports:
+      - '18000:80' 
+    depends_on:
+      - mongo
+  mongo:
+    image: mongo
+    environment:
+      MONGO_INITDB_DATABASE: Testt
+      MONGO_INITDB_ROOT_PASSWORD: root
+      MONGO_INITDB_ROOT_USERNAME: root
+    ports:
+     - "18002:27017"
+    volumes:
+      - mongo-volume:/data/db
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:7.5.2
+    environment:
+      - node.name=elasticsearch
+      - cluster.name=docker-cluster
+      - cluster.initial_master_nodes=elasticsearch
+      - bootstrap.memory_lock=true
+      - "ES_JAVA_OPTS=-Xms256M -Xmx256M"
+      - http.cors.enabled=true
+      - http.cors.allow-origin=*
+      - network.host=_eth0_
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    cap_add:
+      - ALL
+    # privileged: true
+    volumes:
+      - type: volume
+        source: logs
+        target: /var/log
+      - type: volume
+        source: elasticsearchvolume
+        target: /usr/share/elasticsearch/data
+    ports:
+      - 13030:9200
+      - 13031:9300
+  kibana:
+    image: docker.elastic.co/kibana/kibana:7.5.2
+    environment:
+      SERVER_NAME: localhost
+      ELASTICSEARCH_URL: http://elasticsearch:9200/
+    ports:
+      - 13032:5601
+  apm-server:
+    image: docker.elastic.co/apm/apm-server:7.5.2
+    ports:
+      - 8200:8200
+    volumes:
+      - type: volume
+        source: logs
+        target: /var/log
+    ulimits:
+      nproc: 65535
+      memlock:
+        soft: -1
+        hard: -1
+    cap_add:
+      - ALL
+    environment:
+      - output.elasticsearch.hosts=['http://elasticsearch:9200']
+      - apm-server.host="0.0.0.0:8200"
+      - setup.kibana.host="kibana:5601"
+      - setup.template.enabled=true
+      - logging.to_files=false
+    volumes:
+      - ./apm-server.yml:/usr/share/apm-server/apm-server.yml      
+volumes:
+  apm-server:
+  mongo-volume:
+  elasticsearchvolume: 
+  logs:
+  
